@@ -1,0 +1,53 @@
+version: "3.9"
+
+services:
+
+  go-rag:
+    build: .
+    container_name: go-rag
+    ports:
+      - "8080:8080"
+    depends_on:
+      - qdrant
+      - ollama
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - QDRANT_URL=http://qdrant:6333
+
+  qdrant:
+    image: qdrant/qdrant
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_storage:/qdrant/storage
+
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    command: serve
+
+  ollama-init:
+    image: curlimages/curl:8.7.1
+    depends_on:
+      - ollama
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        echo "Waiting for Ollama server..."
+        until curl -s http://ollama:11434/api/tags > /dev/null; do
+          sleep 300
+        done
+        echo "Ollama ready. Pulling model..."
+        curl -X POST http://ollama:11434/api/pull \
+        -d '{"name":"phi3"}'
+        echo "Model pulled successfully"
+
+volumes:
+  qdrant_storage:
+  ollama_data:
